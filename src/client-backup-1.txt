@@ -1,0 +1,471 @@
+// Importing Libraries
+import {
+    clamp,
+    createImageElement,
+    glHelper,
+    text,
+    textAll,
+    zip,
+} from "./client-helper.js";
+import { glMatrix, mat2, mat3, mat4, vec2, vec3 } from "./gl-matrix.js";
+import { BidirectionalPlane, Plane, ReversedPlane } from "./Plane.js";
+
+// Declaring Constants and Variables
+const DEBUG = true;
+const KEYS_TO_WATCH = [
+    "KeyW",
+    "KeyA",
+    "KeyS",
+    "KeyD",
+    "KeyQ",
+    "KeyE",
+    "Space",
+    "ArrowRight",
+    "ArrowLeft",
+    "ArrowUp",
+    "ArrowDown",
+];
+const STATE = {
+    keyIsDown: KEYS_TO_WATCH.map((key) => {
+        let obj = {};
+        obj[key] = false;
+        return obj;
+    }).reduce((acc, cur) => ({ ...acc, ...cur }), {}),
+};
+
+// Getting Reference to HTML Elements
+
+/// Setting up Canvas
+const canvas: HTMLCanvasElement = document.getElementById(
+    "canvas"
+) as HTMLCanvasElement;
+
+let gl: WebGLRenderingContext = canvas.getContext("webgl");
+
+gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+
+// Declaring Functions
+
+/// Executing Main Async Code
+(async function main() {
+    // Setting up WebGL
+    if (!gl) {
+        throw new Error("Your Browser does not Support WebGL");
+    }
+
+    /// Enabling Depth Test
+    gl.enable(gl.DEPTH_TEST);
+
+    /// Enabling Back Face Culling
+    gl.enable(gl.CULL_FACE);
+    gl.frontFace(gl.CCW);
+    gl.cullFace(gl.BACK);
+
+    /// Setting up Shaders 🕶
+    const [vertexShaderSource, fragmentShaderSource] = await textAll(
+        "vertex-shader.glsl",
+        "fragment-shader.glsl"
+    );
+
+    const [vertexShader, fragmentShader] = glHelper.createShaders(
+        gl,
+        gl.VERTEX_SHADER,
+        gl.FRAGMENT_SHADER
+    );
+
+    glHelper.shaderSources(
+        gl,
+        [vertexShader, vertexShaderSource],
+        [fragmentShader, fragmentShaderSource]
+    );
+
+    const shaderCompilationStatus = glHelper.compileShaders(
+        gl,
+        vertexShader,
+        fragmentShader
+    );
+
+    if (shaderCompilationStatus.status === "Error") {
+        let errorMessage = `At shader ${shaderCompilationStatus.shaderIndex}: \n${shaderCompilationStatus.errorMessage}`;
+        console.error(errorMessage);
+
+        throw new Error(errorMessage);
+    }
+
+    const program = gl.createProgram();
+    glHelper.attachShaders(gl, program, vertexShader, fragmentShader);
+
+    gl.linkProgram(program);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+        let errorMessage = gl.getProgramInfoLog(program);
+        console.trace();
+        throw new Error(errorMessage);
+    }
+
+    gl.validateProgram(program);
+    if (!gl.getProgramParameter(program, gl.VALIDATE_STATUS)) {
+        let errorMessage = gl.getProgramInfoLog(program);
+        console.trace();
+        throw new Error(errorMessage);
+    }
+
+    // Creating Buffers
+
+    // const boxVertices = [
+    //     // X, Y, Z           R, G, B
+    //     // Top
+    //     -1.0, 1.0, -1.0, 0.5, 0.5, 0.5, -1.0, 1.0, 1.0, 0.5, 0.5, 0.5, 1.0, 1.0,
+    //     1.0, 0.5, 0.5, 0.5, 1.0, 1.0, -1.0, 0.5, 0.5, 0.5,
+
+    //     // Left
+    //     -1.0, 1.0, 1.0, 0.75, 0.25, 0.5, -1.0, -1.0, 1.0, 0.75, 0.25, 0.5, -1.0,
+    //     -1.0, -1.0, 0.75, 0.25, 0.5, -1.0, 1.0, -1.0, 0.75, 0.25, 0.5,
+
+    //     // Right
+    //     1.0, 1.0, 1.0, 0.25, 0.25, 0.75, 1.0, -1.0, 1.0, 0.25, 0.25, 0.75, 1.0,
+    //     -1.0, -1.0, 0.25, 0.25, 0.75, 1.0, 1.0, -1.0, 0.25, 0.25, 0.75,
+
+    //     // Front
+    //     1.0, 1.0, 1.0, 1.0, 0.0, 0.15, 1.0, -1.0, 1.0, 1.0, 0.0, 0.15, -1.0,
+    //     -1.0, 1.0, 1.0, 0.0, 0.15, -1.0, 1.0, 1.0, 1.0, 0.0, 0.15,
+
+    //     // Back
+    //     1.0, 1.0, -1.0, 0.0, 1.0, 0.15, 1.0, -1.0, -1.0, 0.0, 1.0, 0.15, -1.0,
+    //     -1.0, -1.0, 0.0, 1.0, 0.15, -1.0, 1.0, -1.0, 0.0, 1.0, 0.15,
+
+    //     // Bottom
+    //     -1.0, -1.0, -1.0, 0.5, 0.5, 1.0, -1.0, -1.0, 1.0, 0.5, 0.5, 1.0, 1.0,
+    //     -1.0, 1.0, 0.5, 0.5, 1.0, 1.0, -1.0, -1.0, 0.5, 0.5, 1.0,
+    // ];
+
+    // const boxIndices = [
+    //     // Top
+    //     0, 1, 2, 0, 2, 3,
+
+    //     // Left
+    //     5, 4, 6, 6, 4, 7,
+
+    //     // Right
+    //     8, 9, 10, 8, 10, 11,
+
+    //     // Front
+    //     13, 12, 14, 15, 14, 12,
+
+    //     // Back
+    //     16, 17, 18, 16, 18, 19,
+
+    //     // Bottom
+    //     21, 20, 22, 22, 20, 23,
+    // ];
+    /// Creating some Planes
+    const planeArray: BidirectionalPlane[] = [
+        ...[...new Array(10)].map((_, index) =>
+            BidirectionalPlane.XY({
+                origin: [0, 0, index * 8],
+                delta: [4, 4],
+                color: { r: index * 0.1, g: index * 0.1, b: index * 0.1 },
+                uvOrigin: [0, 0],
+                uvDelta: [4, 4],
+                useTexture: true,
+            })
+        ),
+        BidirectionalPlane.XZ({
+            origin: [
+                -Number.MAX_SAFE_INTEGER / 2,
+                0,
+                -Number.MAX_SAFE_INTEGER / 2,
+            ],
+            delta: [Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER],
+            color: { r: 0.1, g: 0.1, b: 0.1 },
+            uvOrigin: [0, 0],
+            uvDelta: [Number.MAX_SAFE_INTEGER, Number.MAX_SAFE_INTEGER],
+            useTexture: true,
+        }),
+    ];
+    //console.log((ReversedPlane.XY()).planeIndices())
+
+    /// Binding all Planes into one Buffer
+    const vertexData = planeArray
+        .map((plane) => plane.convertVerticesToBufferData())
+        .flat(1);
+    const indexData = planeArray
+        .map((plane, index) => plane.getIndexData(index * 4))
+        .flat(1);
+
+    const vertexBuffer = gl.createBuffer();
+    glHelper.allocateBuffer(
+        gl,
+        vertexBuffer,
+        vertexData,
+        gl.ARRAY_BUFFER,
+        gl.STATIC_DRAW
+    );
+
+    const indexBuffer = gl.createBuffer();
+    glHelper.allocateBuffer(
+        gl,
+        indexBuffer,
+        indexData,
+        gl.ELEMENT_ARRAY_BUFFER,
+        gl.STATIC_DRAW,
+        "uint16"
+    );
+
+    // Attributes
+
+    /// Vector Positon and Color
+    const TOTAL_ATTRIBUTE_SIZE = 8 * Float32Array.BYTES_PER_ELEMENT;
+
+    const [
+        positionAttributeLocation,
+        colorAttributeLocation,
+        vertTexAttributeLocation,
+        useTexAttributeLocation,
+    ] = glHelper.attribLocs(
+        gl,
+        program,
+        "vectorPosition",
+        "vectorColor",
+        "vertTexCoords"
+    );
+    glHelper.enableAttribute(
+        gl,
+        positionAttributeLocation,
+        gl.FLOAT,
+        0,
+        3,
+        TOTAL_ATTRIBUTE_SIZE,
+        Float32Array.BYTES_PER_ELEMENT,
+        false
+    );
+
+    glHelper.enableAttribute(
+        gl,
+        colorAttributeLocation,
+        gl.FLOAT,
+        3,
+        3,
+        TOTAL_ATTRIBUTE_SIZE,
+        Float32Array.BYTES_PER_ELEMENT,
+        false
+    );
+
+    glHelper.enableAttribute(
+        gl,
+        vertTexAttributeLocation,
+        gl.FLOAT,
+        6,
+        2,
+        TOTAL_ATTRIBUTE_SIZE,
+        Float32Array.BYTES_PER_ELEMENT,
+        false
+    );
+
+    // Textures
+    let backroomsWallTexture = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, backroomsWallTexture);
+    gl.texImage2D(
+        gl.TEXTURE_2D,
+        0,
+        gl.RGBA,
+        gl.RGBA,
+        gl.UNSIGNED_BYTE,
+        await createImageElement("./backroomsWall3.jpeg", 64, 64)
+    );
+    gl.generateMipmap(gl.TEXTURE_2D);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.REPEAT);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.REPEAT);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+
+    // Uniforms
+    gl.useProgram(program);
+
+    /// World, View, and Projection Matrices
+    const [
+        worldMatrixLocation,
+        viewMatrixLocation,
+        projMatrixLocation,
+        useTextureLocation,
+    ] = glHelper.uniformLocs(
+        gl,
+        program,
+        "worldMatrix",
+        "viewMatrix",
+        "projectionMatrix",
+        "useTexture"
+    );
+
+    const [worldMatrix, viewMatrix, projMatrix] = glHelper.float32Array2d(
+        3,
+        16
+    );
+
+    const useTexture = 1.0;
+
+    mat4.identity(worldMatrix);
+    mat4.lookAt(viewMatrix, [0, 0, -5], [0, 0, 0], [0, 1, 0]);
+    mat4.perspective(
+        projMatrix,
+        glMatrix.toRadian(80),
+        (gl.canvas as HTMLCanvasElement).clientWidth /
+            (gl.canvas as HTMLCanvasElement).clientHeight,
+        0.1,
+        1000.0
+    );
+
+    zip(
+        [worldMatrix, viewMatrix, projMatrix],
+        [worldMatrixLocation, viewMatrixLocation, projMatrixLocation]
+    ).map(([matrixData, matrixLocation]) =>
+        gl.uniformMatrix4fv(matrixLocation, false, matrixData)
+    );
+
+    gl.uniform1f(useTextureLocation, useTexture);
+
+    // Rendering Loop
+
+    /// Setting up the Identity function
+    const identity = new Float32Array(16);
+    mat4.identity(identity);
+
+    /// Initializing World Angle
+    let worldRotY = 0;
+    let worldRotX = 0;
+
+    /// Initializing View Matrix Parameters
+    let camPosX = 0;
+    let camPosY = 2;
+    let camPosZ = 10;
+    let camRotX = 0;
+    let camRotY = 0;
+    let jumpSpeed = 0;
+    let camPosVec = new Float32Array(3);
+    vec3.set(camPosVec, camPosX, camPosY, camPosZ);
+
+    function draw() {
+        // Reset Projection Matrix
+        mat4.identity(projMatrix);
+        mat4.perspective(
+            projMatrix,
+            glMatrix.toRadian(80),
+            (gl.canvas as HTMLCanvasElement).clientWidth /
+                (gl.canvas as HTMLCanvasElement).clientHeight,
+            0.1,
+            1000.0
+        );
+        gl.uniformMatrix4fv(projMatrixLocation, false, projMatrix);
+
+        // Transforming World Matrix
+        // worldRotY = (performance.now() / 6000) * 2 * Math.PI;
+        // worldRotX = (performance.now() / 5000) * 2 * Math.PI;
+        mat4.rotate(worldMatrix, identity, worldRotY, [0, 1, 0]);
+        mat4.rotate(worldMatrix, worldMatrix, worldRotX, [1, 0, 0]);
+        gl.uniformMatrix4fv(worldMatrixLocation, false, worldMatrix);
+
+        // Updating Velocity
+        jumpSpeed = camPosY >= 2 ? jumpSpeed - 0.008 : Math.max(0, jumpSpeed);
+        camPosY += jumpSpeed;
+        // console.clear();
+        // console.table({ camPosX, camPosY, camPosZ });
+
+        // Translating View Matrix
+        vec3.set(camPosVec, camPosX, camPosY, camPosZ);
+
+        mat4.rotate(viewMatrix, identity, camRotY, [0, 1, 0]);
+        mat4.rotate(viewMatrix, viewMatrix, camRotX, [
+            Math.cos(camRotY),
+            0,
+            Math.sin(camRotY),
+        ]);
+        handleKeyPress();
+
+        vec3.set(camPosVec, camPosX, camPosY, camPosZ);
+        mat4.translate(
+            viewMatrix,
+            viewMatrix,
+            camPosVec.map((i) => -i)
+        );
+
+        gl.uniformMatrix4fv(viewMatrixLocation, false, viewMatrix);
+
+        // Clearing Canvas
+        gl.clearColor(0.0, 0.75, 1.0, 1.0);
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+        // Activating Backrooms Texture
+        gl.bindTexture(gl.TEXTURE_2D, backroomsWallTexture);
+        gl.activeTexture(gl.TEXTURE0);
+
+        // Drawing on the Canvas
+        gl.drawElements(gl.TRIANGLES, indexData.length, gl.UNSIGNED_SHORT, 0);
+    }
+
+    // Setting up Event Listeners
+    window.addEventListener("keydown", (ev) => {
+        if (
+            STATE.keyIsDown["Space"] === false &&
+            ev.code === "Space" &&
+            jumpSpeed === 0
+        )
+            jumpSpeed = 0.17;
+        STATE.keyIsDown[ev.code] = true;
+    });
+
+    window.addEventListener("keyup", (ev) => {
+        STATE.keyIsDown[ev.code] = false;
+    });
+
+    function handleKeyPress() {
+        let key = STATE.keyIsDown;
+
+        let directionMatrix = new Float32Array(16);
+        mat4.rotate(directionMatrix, identity, camRotY, [0, 1, 0]);
+
+        if (key["KeyW"]) {
+            camPosX += directionMatrix[8] / 10;
+            camPosY += directionMatrix[9] / 10;
+            camPosZ -= directionMatrix[10] / 10;
+        }
+        if (key["KeyS"]) {
+            camPosX -= directionMatrix[8] / 10;
+            camPosY -= directionMatrix[9] / 10;
+            camPosZ += directionMatrix[10] / 10;
+        }
+        if (key["KeyD"]) {
+            camPosX += directionMatrix[0] / 10;
+            camPosY += directionMatrix[1] / 10;
+            camPosZ -= directionMatrix[2] / 10;
+        }
+        if (key["KeyA"]) {
+            camPosX -= directionMatrix[0] / 10;
+            camPosY -= directionMatrix[1] / 10;
+            camPosZ += directionMatrix[2] / 10;
+        }
+        // if (key["KeyE"]) camPosY -= 0.1;
+        // if (key["KeyQ"]) camPosY += 0.1;
+        // if (key["Space"]) jumpSpeed = -0.15;
+        if (key["ArrowRight"]) camRotY += 0.03;
+        if (key["ArrowLeft"]) camRotY -= 0.03;
+        if (key["ArrowUp"]) camRotX -= 0.03;
+        if (key["ArrowDown"]) camRotX += 0.03;
+
+        camRotX = clamp(-Math.PI / 2, camRotX, Math.PI / 2);
+    }
+
+    window.addEventListener("resize", (ev) => {
+        gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+
+        draw();
+    });
+
+    // Starting Draw Loop
+    function drawLoop() {
+        draw();
+
+        requestAnimationFrame(drawLoop);
+    }
+
+    drawLoop();
+})();

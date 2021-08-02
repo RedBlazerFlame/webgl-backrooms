@@ -1,0 +1,23 @@
+{
+  "name": "webgl-testing",
+  "version": "1.0.0",
+  "description": "",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "watch": "nodemon ."
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/express": "^4.17.13",
+    "@types/node": "^16.4.7",
+    "nodemon": "^2.0.12"
+  },
+  "dependencies": {
+    "@types/gl-matrix": "^3.2.0",
+    "express": "^4.17.1"
+  }
+}
