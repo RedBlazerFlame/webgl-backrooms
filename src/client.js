@@ -730,39 +730,3 @@ window.addEventListener("mouseup", (ev) => {
 }, {
     capture: false,
 });
-setTimeout(() => __awaiter(void 0, void 0, void 0, function* () {
-    bodyElement.removeChild(canvas);
-    let paragraphElement = document.createElement("p");
-    paragraphElement.appendChild(document.createTextNode("Congratulations! You made it out of the Backrooms!"));
-    bodyElement.style.display = "flex";
-    bodyElement.style.width = "100vw";
-    bodyElement.style.height = "100vh";
-    bodyElement.style.justifyContent = "center";
-    bodyElement.style.alignItems = "center";
-    bodyElement.style.alignContent = "center";
-    bodyElement.style.backgroundColor = "black";
-    paragraphElement.style.fontFamily = "arial";
-    paragraphElement.style.fontSize = "36px";
-    paragraphElement.style.fontWeight = "bold";
-    paragraphElement.style.color = "white";
-    bodyElement.appendChild(paragraphElement);
-    yield delay(5000);
-    paragraphElement.innerText =
-        "Because of this, you will now be rewarded with...";
-    yield delay(5000);
-    paragraphElement.innerText = "FNAF Music!";
-    yield delay(2000);
-    paragraphElement.innerText = "Reward in 3";
-    yield delay(1000);
-    paragraphElement.innerText = "Reward in 2";
-    yield delay(1000);
-    paragraphElement.innerText = "Reward in 1";
-    yield delay(1000);
-    paragraphElement.innerText = "HAPPY BIRTHDAY CRAIG!";
-    yield delay(1000);
-    paragraphElement.innerText =
-        "(Ok it's actually not FNAF music okay byeeeeee :>>>>>>>>)";
-    yield delay(300);
-    bodyElement.removeChild(paragraphElement);
-    bodyElement.innerHTML = `<iframe width="${window.innerWidth}" height="${window.innerHeight}" src="https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay;" allowfullscreen></iframe>`;
-}), 240000);

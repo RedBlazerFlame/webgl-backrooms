@@ -14,7 +14,7 @@
   "license": "ISC",
   "devDependencies": {
     "@types/express": "^4.17.13",
-    "@types/node": "^16.4.7",
+    "@types/node": "^16.11.43",
     "nodemon": "^2.0.12"
   },
   "dependencies": {
